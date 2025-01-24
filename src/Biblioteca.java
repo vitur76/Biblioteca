@@ -74,4 +74,141 @@ public class Biblioteca {
         }
     }
 
+    public List<Carte> cautaCarti(String criteriu) {
+        List<Carte> rezultate = new ArrayList<>();
+        String sql = "SELECT * FROM carti WHERE titlu LIKE ? OR autor LIKE ?;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, "%" + criteriu + "%");
+            pstmt.setString(2, "%" + criteriu + "%");
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                String titlu = rs.getString("titlu");
+                String autor = rs.getString("autor");
+                String gen = rs.getString("gen");
+                int stoc = rs.getInt("stoc");
+                rezultate.add(new Carte(titlu, autor, gen, stoc));
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la cautarea cartilor: " + e.getMessage());
+        }
+        return rezultate;
+    }
+
+    public boolean imprumutaCarte(String utilizator, String titlu) {
+        String sqlSelect = "SELECT stoc FROM carti WHERE titlu = ?;";
+        String sqlInsertImprumut = "INSERT INTO imprumuturi (utilizator, titlu, data_imprumut, data_returnare) VALUES (?, ?, date('now'), date('now', '+' || ? || ' days'));";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmtSelect = conn.prepareStatement(sqlSelect);
+             PreparedStatement pstmtInsert = conn.prepareStatement(sqlInsertImprumut)) {
+
+            pstmtSelect.setString(1, titlu);
+            ResultSet rs = pstmtSelect.executeQuery();
+
+            if (rs.next()) {
+                int stoc = rs.getInt("stoc");
+                if (stoc > 0) {
+                    actualizeazaCarte(titlu, stoc - 1);
+
+                    pstmtInsert.setString(1, utilizator);
+                    pstmtInsert.setString(2, titlu);
+                    pstmtInsert.setInt(3, PERIOADA_IMPRUMUT_ZILE);
+                    pstmtInsert.executeUpdate();
+                    return true;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la imprumutarea cartii: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public void returneazaCarte(String titlu) {
+        String sqlSelect = "SELECT stoc FROM carti WHERE titlu = ?;";
+        String sqlUpdateImprumut = "UPDATE imprumuturi SET data_returnare = date('now') WHERE titlu = ? AND data_returnare IS NULL;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmtSelect = conn.prepareStatement(sqlSelect);
+             PreparedStatement pstmtUpdate = conn.prepareStatement(sqlUpdateImprumut)) {
+
+            pstmtSelect.setString(1, titlu);
+            ResultSet rs = pstmtSelect.executeQuery();
+
+            if (rs.next()) {
+                int stoc = rs.getInt("stoc");
+                actualizeazaCarte(titlu, stoc + 1);
+
+                pstmtUpdate.setString(1, titlu);
+                pstmtUpdate.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la returnarea cartii: " + e.getMessage());
+        }
+    }
+
+    public void verificaImprumuturiExpirate() {
+        String sql = "SELECT * FROM imprumuturi WHERE data_returnare < date('now') AND data_returnare IS NOT NULL;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            System.out.println("Imprumuturi expirate:");
+            while (rs.next()) {
+                String utilizator = rs.getString("utilizator");
+                String titlu = rs.getString("titlu");
+                String dataImprumut = rs.getString("data_imprumut");
+                String dataReturnare = rs.getString("data_returnare");
+
+                System.out.println("Utilizator: " + utilizator + ", Titlu: " + titlu + ", Data Imprumut: " + dataImprumut + ", Data Returnare: " + dataReturnare);
+
+                // Trimiterea notificării prin e-mail sau afișarea unui mesaj simplu
+                trimitereNotificare(utilizator, titlu);
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la verificarea imprumuturilor expirate: " + e.getMessage());
+        }
+    }
+
+    // Metoda pentru trimiterea notificării sau afișarea mesajului de întârziere
+    private void trimitereNotificare(String utilizator, String titlu) {
+        // Logic pentru trimiterea notificării
+        System.out.println("Notificare: Cartea '" + titlu + "' nu a fost returnată la timp de utilizatorul " + utilizator + ".");
+    }
+
+
+    public void afiseazaIstoricImprumuturi(String utilizator) {
+        String sql = "SELECT * FROM imprumuturi WHERE utilizator = ?;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, utilizator);
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                String titlu = rs.getString("titlu");
+                String dataImprumut = rs.getString("data_imprumut");
+                String dataReturnare = rs.getString("data_returnare");
+                System.out.println("Titlu: " + titlu + ", Data Imprumut: " + dataImprumut + ", Data Returnare: " + (dataReturnare != null ? dataReturnare : "Nereturnata"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la afisarea istoricului de imprumuturi: " + e.getMessage());
+        }
+    }
+
+    public void afiseazaToate() {
+        String sql = "SELECT * FROM carti;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String titlu = rs.getString("titlu");
+                String autor = rs.getString("autor");
+                String gen = rs.getString("gen");
+                int stoc = rs.getInt("stoc");
+                System.out.println(new Carte(titlu, autor, gen, stoc));
+            }
+        } catch (SQLException e) {
+            System.err.println("Eroare la afisarea cartilor: " + e.getMessage());
+        }
+    }
+
 }
