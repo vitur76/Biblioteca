@@ -51,4 +51,15 @@ public class Biblioteca {
         }
     }
 
+    public void stergeCarte(String titlu) {
+        String sql = "DELETE FROM carti WHERE titlu = ?;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, titlu);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Eroare la stergerea cartii: " + e.getMessage());
+        }
+    }
+
 }
