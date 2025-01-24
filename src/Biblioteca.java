@@ -62,4 +62,16 @@ public class Biblioteca {
         }
     }
 
+    public void actualizeazaCarte(String titlu, int stocNou) {
+        String sql = "UPDATE carti SET stoc = ? WHERE titlu = ?;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, stocNou);
+            pstmt.setString(2, titlu);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Eroare la actualizarea cartii: " + e.getMessage());
+        }
+    }
+
 }
